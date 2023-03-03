@@ -876,7 +876,7 @@ static bool hubbub31_get_dcc_compression_cap(struct hubbub *hubbub,
 	return true;
 }
 
-static int hubbub31_init_dchub_sys_ctx(struct hubbub *hubbub,
+int hubbub31_init_dchub_sys_ctx(struct hubbub *hubbub,
 		struct dcn_hubbub_phys_addr_config *pa_config)
 {
 	struct dcn20_hubbub *hubbub2 = TO_DCN20_HUBBUB(hubbub);
@@ -1008,6 +1008,24 @@ static bool hubbub31_verify_allow_pstate_change_high(struct hubbub *hubbub)
 	return false;
 }
 
+void hubbub31_init(struct hubbub *hubbub)
+{
+	struct dcn20_hubbub *hubbub2 = TO_DCN20_HUBBUB(hubbub);
+
+	/*Enable clock gate*/
+	if (hubbub->ctx->dc->debug.disable_clock_gate) {
+		/*done in hwseq*/
+		/*REG_UPDATE(DCFCLK_CNTL, DCFCLK_GATE_DIS, 0);*/
+		REG_UPDATE_2(DCHUBBUB_CLOCK_CNTL,
+				DISPCLK_R_DCHUBBUB_GATE_DIS, 0,
+				DCFCLK_R_DCHUBBUB_GATE_DIS, 0);
+	}
+
+	/*
+	only the DCN will determine when to connect the SDP port
+	*/
+	REG_UPDATE(DCHUBBUB_SDPIF_CFG0,	SDPIF_PORT_CONTROL, 1);
+}
 static const struct hubbub_funcs hubbub31_funcs = {
 	.update_dchub = hubbub2_update_dchub,
 	.init_dchub_sys_ctx = hubbub31_init_dchub_sys_ctx,
@@ -1042,5 +1060,7 @@ void hubbub31_construct(struct dcn20_hubbub *hubbub31,
 	hubbub31->detile_buf_size = det_size_kb * 1024;
 	hubbub31->pixel_chunk_size = pixel_chunk_size_kb * 1024;
 	hubbub31->crb_size_segs = config_return_buffer_size_kb / DCN31_CRB_SEGMENT_SIZE_KB;
+
+	hubbub31->debug_test_index_pstate = 0x6;
 }
 

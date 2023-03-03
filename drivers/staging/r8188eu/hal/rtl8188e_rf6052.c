@@ -366,12 +366,12 @@ rtl8188e_PHY_RF6052SetOFDMTxPower(
 	}
 }
 
-static int phy_RF6052_Config_ParaFile(struct adapter *Adapter)
+int phy_RF6052_Config_ParaFile(struct adapter *Adapter)
 {
 	struct bb_reg_def *pPhyReg;
 	struct hal_data_8188e *pHalData = &Adapter->haldata;
 	u32 u4RegValue = 0;
-	int rtStatus = _SUCCESS;
+	int err;
 
 	/* Initialize RF */
 
@@ -396,22 +396,10 @@ static int phy_RF6052_Config_ParaFile(struct adapter *Adapter)
 	udelay(1);/* PlatformStallExecution(1); */
 
 	/*----Initialize RF fom connfiguration file----*/
-	if (HAL_STATUS_FAILURE == ODM_ConfigRFWithHeaderFile(&pHalData->odmpriv))
-		rtStatus = _FAIL;
+	err = ODM_ReadAndConfig_RadioA_1T_8188E(&pHalData->odmpriv);
 
 	/*----Restore RFENV control type----*/;
 	rtl8188e_PHY_SetBBReg(Adapter, pPhyReg->rfintfs, bRFSI_RFENV, u4RegValue);
 
-	return rtStatus;
-}
-
-int PHY_RF6052_Config8188E(struct adapter *Adapter)
-{
-	int rtStatus = _SUCCESS;
-
-	/*  */
-	/*  Config BB and RF */
-	/*  */
-	rtStatus = phy_RF6052_Config_ParaFile(Adapter);
-	return rtStatus;
+	return err;
 }

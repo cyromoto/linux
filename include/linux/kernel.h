@@ -64,15 +64,6 @@
 )
 
 /**
- * lower_48_bits() - return bits 0-47 of a number
- * @n: the number we're accessing
- */
-static inline u64 lower_48_bits(u64 n)
-{
-	return n & ((1ull << 48) - 1);
-}
-
-/**
  * upper_32_bits - return bits 32-63 of a number
  * @n: the number we're accessing
  *
@@ -294,7 +285,7 @@ static inline char *hex_byte_pack_upper(char *buf, u8 byte)
 	return buf;
 }
 
-extern int hex_to_bin(char ch);
+extern int hex_to_bin(unsigned char ch);
 extern int __must_check hex2bin(u8 *dst, const char *src, size_t count);
 extern char *bin2hex(char *dst, const void *src, size_t count);
 
@@ -306,7 +297,7 @@ bool mac_pton(const char *s, u8 *mac);
  *
  * Use tracing_on/tracing_off when you want to quickly turn on or off
  * tracing. It simply enables or disables the recording of the trace events.
- * This also corresponds to the user space /sys/kernel/debug/tracing/tracing_on
+ * This also corresponds to the user space /sys/kernel/tracing/tracing_on
  * file, which gives a means for the kernel and userspace to interact.
  * Place a tracing_off() in the kernel where you want tracing to end.
  * From user space, examine the trace, and then echo 1 > tracing_on

@@ -3456,7 +3456,7 @@ static ssize_t ipr_read_trace(struct file *filp, struct kobject *kobj,
 			      struct bin_attribute *bin_attr,
 			      char *buf, loff_t off, size_t count)
 {
-	struct device *dev = container_of(kobj, struct device, kobj);
+	struct device *dev = kobj_to_dev(kobj);
 	struct Scsi_Host *shost = class_to_shost(dev);
 	struct ipr_ioa_cfg *ioa_cfg = (struct ipr_ioa_cfg *)shost->hostdata;
 	unsigned long lock_flags = 0;
@@ -3912,7 +3912,6 @@ static int ipr_copy_ucode_buffer(struct ipr_sglist *sglist,
 {
 	int bsize_elem, i, result = 0;
 	struct scatterlist *sg;
-	void *kaddr;
 
 	/* Determine the actual number of bytes per element */
 	bsize_elem = PAGE_SIZE * (1 << sglist->order);
@@ -3923,9 +3922,7 @@ static int ipr_copy_ucode_buffer(struct ipr_sglist *sglist,
 			buffer += bsize_elem) {
 		struct page *page = sg_page(sg);
 
-		kaddr = kmap(page);
-		memcpy(kaddr, buffer, bsize_elem);
-		kunmap(page);
+		memcpy_to_page(page, 0, buffer, bsize_elem);
 
 		sg->length = bsize_elem;
 
@@ -3938,9 +3935,7 @@ static int ipr_copy_ucode_buffer(struct ipr_sglist *sglist,
 	if (len % bsize_elem) {
 		struct page *page = sg_page(sg);
 
-		kaddr = kmap(page);
-		memcpy(kaddr, buffer, len % bsize_elem);
-		kunmap(page);
+		memcpy_to_page(page, 0, buffer, len % bsize_elem);
 
 		sg->length = len % bsize_elem;
 	}
@@ -4182,7 +4177,7 @@ static ssize_t ipr_read_async_err_log(struct file *filep, struct kobject *kobj,
 				struct bin_attribute *bin_attr, char *buf,
 				loff_t off, size_t count)
 {
-	struct device *cdev = container_of(kobj, struct device, kobj);
+	struct device *cdev = kobj_to_dev(kobj);
 	struct Scsi_Host *shost = class_to_shost(cdev);
 	struct ipr_ioa_cfg *ioa_cfg = (struct ipr_ioa_cfg *)shost->hostdata;
 	struct ipr_hostrcb *hostrcb;
@@ -4206,7 +4201,7 @@ static ssize_t ipr_next_async_err_log(struct file *filep, struct kobject *kobj,
 				struct bin_attribute *bin_attr, char *buf,
 				loff_t off, size_t count)
 {
-	struct device *cdev = container_of(kobj, struct device, kobj);
+	struct device *cdev = kobj_to_dev(kobj);
 	struct Scsi_Host *shost = class_to_shost(cdev);
 	struct ipr_ioa_cfg *ioa_cfg = (struct ipr_ioa_cfg *)shost->hostdata;
 	struct ipr_hostrcb *hostrcb;
@@ -4267,7 +4262,7 @@ static ssize_t ipr_read_dump(struct file *filp, struct kobject *kobj,
 			     struct bin_attribute *bin_attr,
 			     char *buf, loff_t off, size_t count)
 {
-	struct device *cdev = container_of(kobj, struct device, kobj);
+	struct device *cdev = kobj_to_dev(kobj);
 	struct Scsi_Host *shost = class_to_shost(cdev);
 	struct ipr_ioa_cfg *ioa_cfg = (struct ipr_ioa_cfg *)shost->hostdata;
 	struct ipr_dump *dump;
@@ -4456,7 +4451,7 @@ static ssize_t ipr_write_dump(struct file *filp, struct kobject *kobj,
 			      struct bin_attribute *bin_attr,
 			      char *buf, loff_t off, size_t count)
 {
-	struct device *cdev = container_of(kobj, struct device, kobj);
+	struct device *cdev = kobj_to_dev(kobj);
 	struct Scsi_Host *shost = class_to_shost(cdev);
 	struct ipr_ioa_cfg *ioa_cfg = (struct ipr_ioa_cfg *)shost->hostdata;
 	int rc;
@@ -5370,9 +5365,9 @@ static int __ipr_eh_dev_reset(struct scsi_cmnd *scsi_cmd)
 					continue;
 
 				ipr_cmd->done = ipr_sata_eh_done;
-				if (!(ipr_cmd->qc->flags & ATA_QCFLAG_FAILED)) {
+				if (!(ipr_cmd->qc->flags & ATA_QCFLAG_EH)) {
 					ipr_cmd->qc->err_mask |= AC_ERR_TIMEOUT;
-					ipr_cmd->qc->flags |= ATA_QCFLAG_FAILED;
+					ipr_cmd->qc->flags |= ATA_QCFLAG_EH;
 				}
 			}
 		}
@@ -7142,11 +7137,8 @@ static unsigned int ipr_qc_issue(struct ata_queued_cmd *qc)
 /**
  * ipr_qc_fill_rtf - Read result TF
  * @qc: ATA queued command
- *
- * Return value:
- * 	true
  **/
-static bool ipr_qc_fill_rtf(struct ata_queued_cmd *qc)
+static void ipr_qc_fill_rtf(struct ata_queued_cmd *qc)
 {
 	struct ipr_sata_port *sata_port = qc->ap->private_data;
 	struct ipr_ioasa_gata *g = &sata_port->ioasa;
@@ -7163,8 +7155,6 @@ static bool ipr_qc_fill_rtf(struct ata_queued_cmd *qc)
 	tf->hob_lbal = g->hob_lbal;
 	tf->hob_lbam = g->hob_lbam;
 	tf->hob_lbah = g->hob_lbah;
-
-	return true;
 }
 
 static struct ata_port_operations ipr_sata_ops = {
@@ -9795,7 +9785,7 @@ static int ipr_alloc_mem(struct ipr_ioa_cfg *ioa_cfg)
 					GFP_KERNEL);
 
 		if (!ioa_cfg->hrrq[i].host_rrq)  {
-			while (--i > 0)
+			while (--i >= 0)
 				dma_free_coherent(&pdev->dev,
 					sizeof(u32) * ioa_cfg->hrrq[i].size,
 					ioa_cfg->hrrq[i].host_rrq,
@@ -10068,7 +10058,7 @@ static int ipr_request_other_msi_irqs(struct ipr_ioa_cfg *ioa_cfg,
 			ioa_cfg->vectors_info[i].desc,
 			&ioa_cfg->hrrq[i]);
 		if (rc) {
-			while (--i >= 0)
+			while (--i > 0)
 				free_irq(pci_irq_vector(pdev, i),
 					&ioa_cfg->hrrq[i]);
 			return rc;
@@ -10092,7 +10082,6 @@ static irqreturn_t ipr_test_intr(int irq, void *devp)
 {
 	struct ipr_ioa_cfg *ioa_cfg = (struct ipr_ioa_cfg *)devp;
 	unsigned long lock_flags = 0;
-	irqreturn_t rc = IRQ_HANDLED;
 
 	dev_info(&ioa_cfg->pdev->dev, "Received IRQ : %d\n", irq);
 	spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
@@ -10101,7 +10090,7 @@ static irqreturn_t ipr_test_intr(int irq, void *devp)
 	wake_up(&ioa_cfg->msi_wait_q);
 
 	spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
-	return rc;
+	return IRQ_HANDLED;
 }
 
 /**
@@ -10873,11 +10862,19 @@ static struct notifier_block ipr_notifier = {
  **/
 static int __init ipr_init(void)
 {
+	int rc;
+
 	ipr_info("IBM Power RAID SCSI Device Driver version: %s %s\n",
 		 IPR_DRIVER_VERSION, IPR_DRIVER_DATE);
 
 	register_reboot_notifier(&ipr_notifier);
-	return pci_register_driver(&ipr_driver);
+	rc = pci_register_driver(&ipr_driver);
+	if (rc) {
+		unregister_reboot_notifier(&ipr_notifier);
+		return rc;
+	}
+
+	return 0;
 }
 
 /**

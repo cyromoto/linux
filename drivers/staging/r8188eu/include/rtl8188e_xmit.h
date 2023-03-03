@@ -5,17 +5,7 @@
 #define __RTL8188E_XMIT_H__
 
 #define		MAX_TX_AGG_PACKET_NUMBER	0xFF
-/*  */
-/*  Queue Select Value in TxDesc */
-/*  */
-#define QSLT_BK							0x2/* 0x01 */
-#define QSLT_BE							0x0
-#define QSLT_VI							0x5/* 0x4 */
-#define QSLT_VO							0x7/* 0x6 */
-#define QSLT_BEACON						0x10
-#define QSLT_HIGH						0x11
 #define QSLT_MGNT						0x12
-#define QSLT_CMD						0x13
 
 /* For 88e early mode */
 #define SET_EARLYMODE_PKTNUM(__paddr, __value)			\
@@ -83,12 +73,6 @@
 /* OFFSET 20 */
 #define	RTY_LMT_EN		BIT(17)
 
-enum TXDESC_SC {
-	SC_DONT_CARE = 0x00,
-	SC_UPPER = 0x01,
-	SC_LOWER = 0x02,
-	SC_DUPLICATE = 0x03
-};
 /* OFFSET 20 */
 #define SGI			BIT(6)
 #define USB_TXAGG_NUM_SHT	24
@@ -137,16 +121,10 @@ struct txrpt_ccx_88e {
 
 void rtl8188e_fill_fake_txdesc(struct adapter *padapter, u8 *pDesc,
 			       u32 BufferLen, u8 IsPsPoll, u8 IsBTQosNull);
-s32 rtl8188eu_init_xmit_priv(struct adapter *padapter);
 s32 rtl8188eu_hal_xmit(struct adapter *padapter, struct xmit_frame *frame);
 s32 rtl8188eu_mgnt_xmit(struct adapter *padapter, struct xmit_frame *frame);
 s32 rtl8188eu_xmit_buf_handler(struct adapter *padapter);
-#define hal_xmit_handler rtl8188eu_xmit_buf_handler
 void rtl8188eu_xmit_tasklet(unsigned long priv);
-bool rtl8188eu_xmitframe_complete(struct adapter *padapter,
-				 struct xmit_priv *pxmitpriv,
-				 struct xmit_buf *pxmitbuf);
-
-void handle_txrpt_ccx_88e(struct adapter *adapter, u8 *buf);
+bool rtl8188eu_xmitframe_complete(struct adapter *padapter);
 
 #endif /* __RTL8188E_XMIT_H__ */

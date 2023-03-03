@@ -162,7 +162,7 @@ struct iscsi_transport {
  * transport registration upcalls
  */
 extern struct scsi_transport_template *iscsi_register_transport(struct iscsi_transport *tt);
-extern int iscsi_unregister_transport(struct iscsi_transport *tt);
+extern void iscsi_unregister_transport(struct iscsi_transport *tt);
 
 /*
  * control plane upcalls
@@ -211,6 +211,8 @@ struct iscsi_cls_conn {
 	struct mutex ep_mutex;
 	struct iscsi_endpoint *ep;
 
+	/* Used when accessing flags and queueing work. */
+	spinlock_t lock;
 	unsigned long flags;
 	struct work_struct cleanup_work;
 
@@ -232,6 +234,14 @@ enum {
 	ISCSI_SESSION_LOGGED_IN,
 	ISCSI_SESSION_FAILED,
 	ISCSI_SESSION_FREE,
+};
+
+enum {
+	ISCSI_SESSION_TARGET_UNBOUND,
+	ISCSI_SESSION_TARGET_ALLOCATED,
+	ISCSI_SESSION_TARGET_SCANNED,
+	ISCSI_SESSION_TARGET_UNBINDING,
+	ISCSI_SESSION_TARGET_MAX,
 };
 
 #define ISCSI_MAX_TARGET -1
@@ -262,6 +272,7 @@ struct iscsi_cls_session {
 	 */
 	pid_t creator;
 	int state;
+	int target_state;			/* session target bind state */
 	int sid;				/* session id */
 	void *dd_data;				/* LLD private data */
 	struct device dev;	/* sysfs transport/container device */
@@ -295,7 +306,7 @@ extern void iscsi_host_for_each_session(struct Scsi_Host *shost,
 struct iscsi_endpoint {
 	void *dd_data;			/* LLD private data */
 	struct device dev;
-	uint64_t id;
+	int id;
 	struct iscsi_cls_conn *conn;
 };
 
@@ -440,6 +451,7 @@ extern struct iscsi_cls_session *iscsi_create_session(struct Scsi_Host *shost,
 						struct iscsi_transport *t,
 						int dd_size,
 						unsigned int target_id);
+extern void iscsi_force_destroy_session(struct iscsi_cls_session *session);
 extern void iscsi_remove_session(struct iscsi_cls_session *session);
 extern void iscsi_free_session(struct iscsi_cls_session *session);
 extern struct iscsi_cls_conn *iscsi_alloc_conn(struct iscsi_cls_session *sess,

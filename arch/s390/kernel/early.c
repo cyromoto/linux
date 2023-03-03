@@ -18,6 +18,7 @@
 #include <linux/uaccess.h>
 #include <linux/kernel.h>
 #include <asm/asm-extable.h>
+#include <linux/memblock.h>
 #include <asm/diag.h>
 #include <asm/ebcdic.h>
 #include <asm/ipl.h>
@@ -149,7 +150,7 @@ static __init void setup_topology(void)
 	topology_max_mnest = max_mnest;
 }
 
-static void early_pgm_check_handler(struct pt_regs *regs)
+void __do_early_pgm_check(struct pt_regs *regs)
 {
 	if (!fixup_exception(regs))
 		disabled_wait();
@@ -159,12 +160,9 @@ static noinline __init void setup_lowcore_early(void)
 {
 	psw_t psw;
 
-	psw.addr = (unsigned long)s390_base_pgm_handler;
-	psw.mask = PSW_MASK_BASE | PSW_DEFAULT_KEY | PSW_MASK_EA | PSW_MASK_BA;
-	if (IS_ENABLED(CONFIG_KASAN))
-		psw.mask |= PSW_MASK_DAT;
+	psw.addr = (unsigned long)early_pgm_check_handler;
+	psw.mask = PSW_KERNEL_BITS;
 	S390_lowcore.program_new_psw = psw;
-	s390_base_pgm_handler_fn = early_pgm_check_handler;
 	S390_lowcore.preempt_count = INIT_PREEMPT_COUNT;
 }
 
@@ -228,6 +226,8 @@ static __init void detect_machine_facilities(void)
 		S390_lowcore.machine_flags |= MACHINE_FLAG_PCI_MIO;
 		/* the control bit is set during PCI initialization */
 	}
+	if (test_facility(194))
+		S390_lowcore.machine_flags |= MACHINE_FLAG_RDP;
 }
 
 static inline void save_vector_registers(void)
@@ -268,7 +268,7 @@ char __bootdata(early_command_line)[COMMAND_LINE_SIZE];
 static void __init setup_boot_command_line(void)
 {
 	/* copy arch command line */
-	strlcpy(boot_command_line, early_command_line, COMMAND_LINE_SIZE);
+	strscpy(boot_command_line, early_command_line, COMMAND_LINE_SIZE);
 }
 
 static void __init check_image_bootable(void)
@@ -289,7 +289,6 @@ static void __init sort_amode31_extable(void)
 
 void __init startup_init(void)
 {
-	sclp_early_adjust_va();
 	reset_tod_clock();
 	check_image_bootable();
 	time_early_init();

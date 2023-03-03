@@ -10,8 +10,6 @@
 #ifndef __DRV_TYPES_H__
 #define __DRV_TYPES_H__
 
-#define DRV_NAME "r8188eu"
-
 #include "osdep_service.h"
 #include "wlan_bssdef.h"
 #include "rtw_ht.h"
@@ -26,7 +24,6 @@
 #include "rtw_eeprom.h"
 #include "sta_info.h"
 #include "rtw_mlme.h"
-#include "rtw_debug.h"
 #include "rtw_rf.h"
 #include "rtw_event.h"
 #include "rtw_led.h"
@@ -35,11 +32,11 @@
 #include "rtw_ap.h"
 #include "rtw_br_ext.h"
 #include "rtl8188e_hal.h"
+#include "rtw_fw.h"
 
-#define DRIVERVERSION	"v4.1.4_6773.20130222"
+#define FW_RTL8188EU	"rtlwifi/rtl8188eufw.bin"
 
 struct registry_priv {
-	u8	chip_version;
 	u8	rfintfs;
 	u8	lbkmode;
 	u8	hci;
@@ -116,11 +113,6 @@ struct registry_priv {
 
 #define MAX_CONTINUAL_URB_ERR		4
 
-struct rt_firmware {
-	u8 *data;
-	u32 size;
-};
-
 struct dvobj_priv {
 	struct adapter *if1;
 
@@ -160,7 +152,6 @@ struct adapter {
 	struct	mlme_ext_priv mlmeextpriv;
 	struct	cmd_priv	cmdpriv;
 	struct	evt_priv	evtpriv;
-	struct	io_priv	iopriv;
 	struct	xmit_priv	xmitpriv;
 	struct	recv_priv	recvpriv;
 	struct	sta_priv	stapriv;
@@ -175,14 +166,11 @@ struct adapter {
 
 	s32	bDriverStopped;
 	s32	bSurpriseRemoved;
-	s32	bCardDisableWOHSM;
 
 	u8	hw_init_completed;
 	s8	signal_strength;
 
 	void *cmdThread;
-	void (*intf_start)(struct adapter *adapter);
-	void (*intf_stop)(struct adapter *adapter);
 	struct  net_device *pnetdev;
 
 	/*  used by rtw_rereg_nd_name related function */
@@ -196,7 +184,6 @@ struct adapter {
 	int bup;
 	struct net_device_stats stats;
 	struct iw_statistics iwstats;
-	struct proc_dir_entry *dir_dev;/*  for proc directory */
 
 	int net_closed;
 	u8 bFWReady;
@@ -227,7 +214,7 @@ struct adapter {
 
 #define adapter_to_dvobj(adapter) (adapter->dvobj)
 
-int rtw_handle_dualmac(struct adapter *adapter, bool init);
+void rtw_handle_dualmac(struct adapter *adapter, bool init);
 
 static inline u8 *myid(struct eeprom_priv *peepriv)
 {

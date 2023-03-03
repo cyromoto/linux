@@ -171,6 +171,7 @@ static int __init processor_probe(struct parisc_device *dev)
 	p->cpu_num = cpu_info.cpu_num;
 	p->cpu_loc = cpu_info.cpu_loc;
 
+	set_cpu_possible(cpuid, true);
 	store_cpu_topology(cpuid);
 
 #ifdef CONFIG_SMP
@@ -271,9 +272,14 @@ void __init collect_boot_cpu_data(void)
 		printk(KERN_INFO "capabilities 0x%lx\n",
 			boot_cpu_data.pdc.capabilities);
 
-	if (pdc_model_sysmodel(boot_cpu_data.pdc.sys_model_name) == PDC_OK)
-		printk(KERN_INFO "model %s\n",
+	if (pdc_model_sysmodel(OS_ID_HPUX, boot_cpu_data.pdc.sys_model_name) == PDC_OK)
+		pr_info("HP-UX model name: %s\n",
 			boot_cpu_data.pdc.sys_model_name);
+
+	serial_no[0] = 0;
+	if (pdc_model_sysmodel(OS_ID_MPEXL, serial_no) == PDC_OK &&
+		serial_no[0])
+		pr_info("MPE/iX model name: %s\n", serial_no);
 
 	dump_stack_set_arch_desc("%s", boot_cpu_data.pdc.sys_model_name);
 
@@ -325,8 +331,6 @@ int init_per_cpu(int cpunum)
 
 	set_firmware_width();
 	ret = pdc_coproc_cfg(&coproc_cfg);
-
-	store_cpu_topology(cpunum);
 
 	if(ret >= 0 && coproc_cfg.ccr_functional) {
 		mtctl(coproc_cfg.ccr_functional, 10);  /* 10 == Coprocessor Control Reg */
@@ -419,8 +423,7 @@ show_cpuinfo (struct seq_file *m, void *v)
 		}
 		seq_printf(m, " (0x%02lx)\n", boot_cpu_data.pdc.capabilities);
 
-		seq_printf(m, "model\t\t: %s\n"
-				"model name\t: %s\n",
+		seq_printf(m, "model\t\t: %s - %s\n",
 				 boot_cpu_data.pdc.sys_model_name,
 				 cpuinfo->dev ?
 				 cpuinfo->dev->name : "Unknown");
@@ -461,6 +464,13 @@ static struct parisc_driver cpu_driver __refdata = {
  */
 void __init processor_init(void)
 {
+	unsigned int cpu;
+
 	reset_cpu_topology();
+
+	/* reset possible mask. We will mark those which are possible. */
+	for_each_possible_cpu(cpu)
+		set_cpu_possible(cpu, false);
+
 	register_parisc_driver(&cpu_driver);
 }

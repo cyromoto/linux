@@ -279,8 +279,7 @@ static int usbdev_mmap(struct file *file, struct vm_area_struct *vma)
 		}
 	}
 
-	vma->vm_flags |= VM_IO;
-	vma->vm_flags |= (VM_DONTEXPAND | VM_DONTDUMP);
+	vm_flags_set(vma, VM_IO | VM_DONTEXPAND | VM_DONTDUMP);
 	vma->vm_ops = &usbdev_vm_ops;
 	vma->vm_private_data = usbm;
 
@@ -1209,12 +1208,16 @@ static int do_proc_control(struct usb_dev_state *ps,
 
 		usb_unlock_device(dev);
 		i = usbfs_start_wait_urb(urb, tmo, &actlen);
+
+		/* Linger a bit, prior to the next control message. */
+		if (dev->quirks & USB_QUIRK_DELAY_CTRL_MSG)
+			msleep(200);
 		usb_lock_device(dev);
 		snoop_urb(dev, NULL, pipe, actlen, i, COMPLETE, tbuf, actlen);
 		if (!i && actlen) {
 			if (copy_to_user(ctrl->data, tbuf, actlen)) {
 				ret = -EFAULT;
-				goto recv_fault;
+				goto done;
 			}
 		}
 	} else {
@@ -1231,6 +1234,10 @@ static int do_proc_control(struct usb_dev_state *ps,
 
 		usb_unlock_device(dev);
 		i = usbfs_start_wait_urb(urb, tmo, &actlen);
+
+		/* Linger a bit, prior to the next control message. */
+		if (dev->quirks & USB_QUIRK_DELAY_CTRL_MSG)
+			msleep(200);
 		usb_lock_device(dev);
 		snoop_urb(dev, NULL, pipe, actlen, i, COMPLETE, NULL, 0);
 	}
@@ -1242,10 +1249,6 @@ static int do_proc_control(struct usb_dev_state *ps,
 	}
 	ret = (i < 0 ? i : actlen);
 
- recv_fault:
-	/* Linger a bit, prior to the next control message. */
-	if (dev->quirks & USB_QUIRK_DELAY_CTRL_MSG)
-		msleep(200);
  done:
 	kfree(dr);
 	usb_free_urb(urb);
@@ -1430,7 +1433,7 @@ static int proc_getdriver(struct usb_dev_state *ps, void __user *arg)
 	if (!intf || !intf->dev.driver)
 		ret = -ENODATA;
 	else {
-		strlcpy(gd.driver, intf->dev.driver->name,
+		strscpy(gd.driver, intf->dev.driver->name,
 				sizeof(gd.driver));
 		ret = (copy_to_user(arg, &gd, sizeof(gd)) ? -EFAULT : 0);
 	}

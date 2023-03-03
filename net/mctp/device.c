@@ -313,6 +313,7 @@ void mctp_dev_hold(struct mctp_dev *mdev)
 void mctp_dev_put(struct mctp_dev *mdev)
 {
 	if (mdev && refcount_dec_and_test(&mdev->refs)) {
+		kfree(mdev->addrs);
 		dev_put(mdev->dev);
 		kfree_rcu(mdev, rcu);
 	}
@@ -428,12 +429,6 @@ static void mctp_unregister(struct net_device *dev)
 	struct mctp_dev *mdev;
 
 	mdev = mctp_dev_get_rtnl(dev);
-	if (mdev && !mctp_known(dev)) {
-		// Sanity check, should match what was set in mctp_register
-		netdev_warn(dev, "%s: BUG mctp_ptr set for unknown type %d",
-			    __func__, dev->type);
-		return;
-	}
 	if (!mdev)
 		return;
 
@@ -441,7 +436,6 @@ static void mctp_unregister(struct net_device *dev)
 
 	mctp_route_remove_dev(mdev);
 	mctp_neigh_remove_dev(mdev);
-	kfree(mdev->addrs);
 
 	mctp_dev_put(mdev);
 }
@@ -451,14 +445,8 @@ static int mctp_register(struct net_device *dev)
 	struct mctp_dev *mdev;
 
 	/* Already registered? */
-	mdev = rtnl_dereference(dev->mctp_ptr);
-
-	if (mdev) {
-		if (!mctp_known(dev))
-			netdev_warn(dev, "%s: BUG mctp_ptr set for unknown type %d",
-				    __func__, dev->type);
+	if (rtnl_dereference(dev->mctp_ptr))
 		return 0;
-	}
 
 	/* only register specific types */
 	if (!mctp_known(dev))
